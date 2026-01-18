@@ -1,0 +1,19 @@
+# Core API
+fastapi
+uvicorn[standard]
+
+# Redis client
+redis
+
+# Embeddings
+sentence-transformers
+numpy
+
+# LLM client
+groq
+
+# Metrics & Dashboard
+streamlit
+
+# Environment variables
+python-dotenv
