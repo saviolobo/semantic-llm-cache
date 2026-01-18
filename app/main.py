@@ -5,8 +5,11 @@ Orchestrates embedding, cache lookup, LLM calls, and metrics.
 
 import logging
 import time
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from app.embeddings import get_embedding
 from app.cache import SemanticCache
@@ -25,7 +28,12 @@ logger = logging.getLogger(__name__)
 if not LLM_API_KEY:
     raise RuntimeError("GROQ_API_KEY environment variable is not set")
 
+# Rate limiter - uses client IP address
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="Semantic LLM Cache")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Initialize cache
 cache = SemanticCache()
@@ -33,6 +41,9 @@ cache = SemanticCache()
 # Query length limits
 MAX_QUERY_LENGTH = 2000
 MIN_QUERY_LENGTH = 1
+
+# Rate limit configuration
+RATE_LIMIT = "10/minute"
 
 
 class QueryRequest(BaseModel):
@@ -52,7 +63,8 @@ class QueryResponse(BaseModel):
 
 
 @app.post("/query", response_model=QueryResponse)
-async def query(request: QueryRequest):
+@limiter.limit(RATE_LIMIT)
+async def query(request: Request, query_request: QueryRequest):
     """
     Process query with semantic caching.
 
@@ -61,13 +73,15 @@ async def query(request: QueryRequest):
     2. Search cache for similar queries
     3. If hit: return cached response
     4. If miss: call LLM, cache result, return response
+
+    Rate limited to 10 requests per minute per IP.
     """
     start_time = time.time()
-    logger.info(f"Processing query: {request.query[:50]}...")
+    logger.info(f"Processing query: {query_request.query[:50]}...")
 
     try:
         # Step 1: Generate embedding
-        query_embedding = get_embedding(request.query)
+        query_embedding = get_embedding(query_request.query)
 
         # Step 2: Search cache
         cached_result = cache.search(query_embedding)
@@ -87,10 +101,10 @@ async def query(request: QueryRequest):
 
         # Cache miss - call LLM
         logger.info("Cache MISS - calling LLM")
-        llm_response = get_llm_response(request.query)
+        llm_response = get_llm_response(query_request.query)
 
         # Store in cache
-        cache.store(request.query, llm_response, query_embedding)
+        cache.store(query_request.query, llm_response, query_embedding)
 
         latency_ms = (time.time() - start_time) * 1000
         metrics.record_miss(latency_ms)
