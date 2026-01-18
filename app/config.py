@@ -5,6 +5,10 @@ All constants and settings in one place.
 
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Redis Configuration
 REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")

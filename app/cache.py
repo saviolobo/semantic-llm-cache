@@ -7,7 +7,7 @@ import redis
 import numpy as np
 from typing import Optional, Dict, Any
 from redis.commands.search.field import VectorField, TextField
-from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 
 from app.config import (
@@ -94,9 +94,12 @@ class SemanticCache:
                 similarity = 1 - score
 
                 if similarity >= SIMILARITY_THRESHOLD:
+                    # Handle both bytes and string responses
+                    query_val = doc.query.decode("utf-8") if isinstance(doc.query, bytes) else doc.query
+                    response_val = doc.response.decode("utf-8") if isinstance(doc.response, bytes) else doc.response
                     return {
-                        "query": doc.query.decode("utf-8"),
-                        "response": doc.response.decode("utf-8"),
+                        "query": query_val,
+                        "response": response_val,
                         "score": similarity,
                     }
         except redis.exceptions.ResponseError:
