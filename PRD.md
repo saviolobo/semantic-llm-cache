@@ -42,6 +42,8 @@ Query → Embed → Vector Search → Hit? → Return cached response
 - Support concurrent requests
 - Handle Redis failures gracefully
 - Log all cache decisions for debugging
+- Rate limiting (10 requests/minute per IP)
+- Input validation (query length 1-2000 chars)
 
 ## Out of Scope
 - Multi-tenancy / user authentication

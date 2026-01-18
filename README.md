@@ -11,7 +11,9 @@ LLM API calls are expensive (~$0.01-0.10 per request) and slow (500ms-3s latency
 - Redis Stack with vector search for fast lookup
 - Real-time metrics tracking (hit rate, latency, cost savings)
 - Clean separation of concerns across modules
-- Live Streamlit dashboard for monitoring
+- Live Streamlit dashboard for monitoring and testing
+- Rate limiting (10 requests/minute per IP)
+- Input validation and error handling
 
 ## Architecture
 
@@ -220,6 +222,7 @@ LLM_MAX_TOKENS = 500
 ```
 semantic-llm-cache/
 ├── app/
+│   ├── __init__.py       # Package init
 │   ├── main.py           # FastAPI orchestration
 │   ├── cache.py          # Redis vector search
 │   ├── embeddings.py     # Sentence-Transformers
@@ -227,9 +230,16 @@ semantic-llm-cache/
 │   ├── metrics.py        # Performance tracking
 │   └── config.py         # Configuration
 ├── dashboard/
+│   ├── __init__.py       # Package init
 │   └── metrics_dashboard.py  # Streamlit UI
+├── tests/
+│   ├── test_api.py       # API endpoint tests
+│   ├── test_cache.py     # Cache logic tests
+│   ├── test_embeddings.py # Embedding tests
+│   └── test_metrics.py   # Metrics tests
 ├── docker-compose.yml    # Redis Stack setup
 ├── requirements.txt      # Python dependencies
+├── .env.example          # Environment template
 ├── PRD.md               # Technical requirements
 └── README.md            # This file
 ```
@@ -279,6 +289,12 @@ streamlit run dashboard/metrics_dashboard.py
    - Cost savings accumulating
 
 Click "🔄 Refresh Metrics" to update the stats after sending queries.
+
+## Running Tests
+
+```bash
+pytest tests/ -v
+```
 
 ## Future Enhancements
 
