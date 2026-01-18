@@ -17,3 +17,7 @@ streamlit
 
 # Environment variables
 python-dotenv
+
+# Testing
+pytest
+httpx
