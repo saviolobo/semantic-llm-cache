@@ -3,23 +3,45 @@ FastAPI server for semantic LLM caching.
 Orchestrates embedding, cache lookup, LLM calls, and metrics.
 """
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+import logging
 import time
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
 from app.embeddings import get_embedding
 from app.cache import SemanticCache
-from app.llm import get_llm_response
+from app.llm import get_llm_response, LLMError
 from app.metrics import metrics
+from app.config import LLM_API_KEY
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Validate API key on startup
+if not LLM_API_KEY:
+    raise RuntimeError("GROQ_API_KEY environment variable is not set")
 
 app = FastAPI(title="Semantic LLM Cache")
 
 # Initialize cache
 cache = SemanticCache()
 
+# Query length limits
+MAX_QUERY_LENGTH = 2000
+MIN_QUERY_LENGTH = 1
+
 
 class QueryRequest(BaseModel):
-    query: str
+    query: str = Field(
+        ...,
+        min_length=MIN_QUERY_LENGTH,
+        max_length=MAX_QUERY_LENGTH,
+        description="The query to process",
+    )
 
 
 class QueryResponse(BaseModel):
@@ -41,6 +63,7 @@ async def query(request: QueryRequest):
     4. If miss: call LLM, cache result, return response
     """
     start_time = time.time()
+    logger.info(f"Processing query: {request.query[:50]}...")
 
     try:
         # Step 1: Generate embedding
@@ -53,6 +76,7 @@ async def query(request: QueryRequest):
             # Cache hit
             latency_ms = (time.time() - start_time) * 1000
             metrics.record_hit(latency_ms)
+            logger.info(f"Cache HIT - similarity: {cached_result['score']:.4f}, latency: {latency_ms:.2f}ms")
 
             return QueryResponse(
                 response=cached_result["response"],
@@ -62,6 +86,7 @@ async def query(request: QueryRequest):
             )
 
         # Cache miss - call LLM
+        logger.info("Cache MISS - calling LLM")
         llm_response = get_llm_response(request.query)
 
         # Store in cache
@@ -69,6 +94,7 @@ async def query(request: QueryRequest):
 
         latency_ms = (time.time() - start_time) * 1000
         metrics.record_miss(latency_ms)
+        logger.info(f"LLM response cached, latency: {latency_ms:.2f}ms")
 
         return QueryResponse(
             response=llm_response,
@@ -77,8 +103,12 @@ async def query(request: QueryRequest):
             similarity_score=None,
         )
 
+    except LLMError as e:
+        logger.error(f"LLM error: {e}")
+        raise HTTPException(status_code=503, detail="LLM service unavailable")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @app.get("/metrics")
@@ -91,6 +121,7 @@ async def get_metrics():
 async def reset_metrics():
     """Reset all metrics to zero."""
     metrics.reset()
+    logger.info("Metrics reset")
     return {"status": "metrics reset"}
 
 
@@ -98,6 +129,7 @@ async def reset_metrics():
 async def clear_cache():
     """Clear all cached entries."""
     cache.clear()
+    logger.info("Cache cleared")
     return {"status": "cache cleared"}
 
 

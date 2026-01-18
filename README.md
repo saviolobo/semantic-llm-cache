@@ -272,13 +272,13 @@ streamlit run dashboard/metrics_dashboard.py
 
 3. Send queries via API or Swagger UI (http://localhost:8000/docs)
 
-4. Watch the dashboard update in real-time:
+4. Watch the dashboard update:
    - Total requests incrementing
    - Cache hit rate increasing as you repeat similar queries
    - Average latency decreasing on cache hits
    - Cost savings accumulating
 
-The dashboard auto-refreshes every 2 seconds, showing live metrics as you test the caching behavior.
+Click "🔄 Refresh Metrics" to update the stats after sending queries.
 
 ## Future Enhancements
 

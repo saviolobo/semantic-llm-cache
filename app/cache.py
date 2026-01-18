@@ -3,12 +3,16 @@ Semantic cache implementation using Redis Vector Search.
 Handles index creation, similarity search, and cache storage.
 """
 
+import hashlib
+import logging
 import redis
 import numpy as np
 from typing import Optional, Dict, Any
 from redis.commands.search.field import VectorField, TextField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
+
+logger = logging.getLogger(__name__)
 
 from app.config import (
     REDIS_HOST,
@@ -102,9 +106,8 @@ class SemanticCache:
                         "response": response_val,
                         "score": similarity,
                     }
-        except redis.exceptions.ResponseError:
-            # Index might be empty
-            pass
+        except redis.exceptions.ResponseError as e:
+            logger.warning(f"Cache search error: {e}")
 
         return None
 
@@ -117,8 +120,9 @@ class SemanticCache:
             response: LLM response
             query_embedding: Query vector embedding
         """
-        # Generate unique key
-        key = f"{REDIS_INDEX_NAME}:{hash(query)}"
+        # Generate unique key using SHA256 for consistency across sessions
+        query_hash = hashlib.sha256(query.encode()).hexdigest()[:16]
+        key = f"{REDIS_INDEX_NAME}:{query_hash}"
 
         # Convert embedding to bytes
         embedding_bytes = query_embedding.astype(np.float32).tobytes()
