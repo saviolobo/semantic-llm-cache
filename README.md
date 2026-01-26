@@ -2,6 +2,10 @@
 
 A production-style semantic caching layer for LLM applications that reduces API costs and latency by caching semantically similar queries using vector embeddings and Redis Stack.
 
+## Demo
+
+![Semantic LLM Cache Demo](assets/demo.gif)
+
 ## Overview
 
 LLM API calls are expensive (~$0.01-0.10 per request) and slow (500ms-3s latency). This system intercepts queries, checks for semantically similar past queries, and returns cached responses when similarity exceeds a configurable threshold.
